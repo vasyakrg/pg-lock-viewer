@@ -1,0 +1,35 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    volumes:
+      - ./queries:/app/queries:ro
+    container_name: pg-lock-viewer-backend
+    env_file:
+      - .env
+    ports:
+      - "3001:3001"
+    networks:
+      - pg-lock-viewer-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pg-lock-viewer-frontend
+    # ports:
+    #   - "3000:80"
+    expose:
+      - 3000
+    depends_on:
+      - backend
+    networks:
+      - pg-lock-viewer-network
+
+networks:
+  pg-lock-viewer-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
