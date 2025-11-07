@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pg-lock-viewer.fullname" . }}-queries
+  labels:
+    {{- include "pg-lock-viewer.labels" . | nindent 4 }}
+data:
+  lock.sql: |
+{{ .Values.queries.lock | indent 4 }}
+  lockAndWho.sql: |
+{{ .Values.queries.lockAndWho | indent 4 }}
+  waiting.sql: |
+{{ .Values.queries.waiting | indent 4 }}

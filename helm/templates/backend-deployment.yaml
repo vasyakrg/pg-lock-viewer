@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pg-lock-viewer.fullname" . }}-backend
+  labels:
+    {{- include "pg-lock-viewer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pg-lock-viewer.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "pg-lock-viewer.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: backend
+          image: {{ include "pg-lock-viewer.backend.image" . }}
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3001
+              protocol: TCP
+          env:
+            - name: DB_HOST
+              value: {{ .Values.backend.env.DB_HOST | quote }}
+            - name: DB_PORT
+              value: {{ .Values.backend.env.DB_PORT | quote }}
+            - name: DB_NAME
+              value: {{ .Values.backend.env.DB_NAME | quote }}
+            - name: DB_USER
+              value: {{ .Values.backend.env.DB_USER | quote }}
+            - name: DB_PASSWORD
+              value: {{ .Values.backend.env.DB_PASSWORD | quote }}
+            - name: QUERY_TIMEOUT
+              value: {{ .Values.backend.env.QUERY_TIMEOUT | quote }}
+            - name: PORT
+              value: {{ .Values.backend.env.PORT | quote }}
+          volumeMounts:
+            - name: queries
+              mountPath: /app/queries
+              readOnly: true
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /api/queries
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/queries
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: queries
+          configMap:
+            name: {{ include "pg-lock-viewer.fullname" . }}-queries

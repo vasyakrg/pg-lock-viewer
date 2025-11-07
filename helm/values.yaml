@@ -1,0 +1,104 @@
+imageRegistry: ghcr.io
+
+backend:
+  image:
+    repository: "ghcr.io/vasyakrg/pg-lock-viewer-backend"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 3001
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  env:
+    DB_HOST: ""
+    DB_PORT: "5432"
+    DB_NAME: ""
+    DB_USER: ""
+    DB_PASSWORD: ""
+    QUERY_TIMEOUT: "30000"
+    PORT: "3001"
+
+frontend:
+  image:
+    repository: "ghcr.io/vasyakrg/pg-lock-viewer-frontend"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: pg-lock-viewer.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+queries:
+  lock: |
+    SELECT a.datname,
+           l.relation::regclass,
+           l.transactionid,
+           l.mode,
+           l.GRANTED,
+           a.usename,
+           a.query,
+           a.query_start,
+           age(now(), a.query_start) AS "age",
+           a.pid
+    FROM pg_stat_activity a
+    JOIN pg_locks l ON l.pid = a.pid
+    ORDER BY age DESC ;
+  lockAndWho: |
+    SELECT COALESCE(blockingl.relation::regclass::text,blockingl.locktype) AS locked_item
+         , now() - blockeda.query_start                                    AS waiting_duration
+         , blockeda.pid                                                    AS blocked_pid
+         , blockeda.query                                                  AS blocked_query
+         , blockedl.mode                                                   AS blocked_mode
+         , blockinga.pid                                                   AS blocking_pid
+         , blockinga.query                                                 AS blocking_query
+         , blockingl.mode                                                  AS blocking_mode
+         , blockeda.datname
+      FROM pg_catalog.pg_locks blockedl
+      JOIN pg_stat_activity blockeda
+        ON blockedl.pid = blockeda.pid
+      JOIN pg_catalog.pg_locks blockingl
+        ON (((       blockingl.transactionid = blockedl.transactionid)
+             OR (    blockingl.relation = blockedl.relation
+                 AND blockingl.locktype = blockedl.locktype))
+            AND blockedl.pid != blockingl.pid)
+      JOIN pg_stat_activity blockinga
+        ON blockingl.pid = blockinga.pid
+       AND blockinga.datid = blockeda.datid
+     WHERE NOT blockedl.granted
+     ORDER BY waiting_duration DESC;
+  waiting: |
+    SELECT
+
+      pid,
+      datname,
+      now() - pg_stat_activity.query_start AS duration,
+      query,
+      state
+    FROM pg_stat_activity
+    WHERE (now() - pg_stat_activity.query_start) > interval '1 minutes'
+    ORDER BY duration DESC ;
