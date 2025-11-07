@@ -44,7 +44,7 @@
     </div>
 
     <footer class="footer">
-      <p>&copy; GGSel LTD</p>
+      <p>&copy; PG Lock Viewer (C) 2025</p>
     </footer>
   </div>
 </template>
